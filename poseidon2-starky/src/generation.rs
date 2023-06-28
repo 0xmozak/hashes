@@ -7,37 +7,36 @@ use zkhash::fields::goldilocks::FpGoldiLocks;
 use zkhash::poseidon2::poseidon2::Poseidon2;
 use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
+// Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
-// A row of the preimage
 pub struct Row<Field: RichField> {
     preimage: [Field; STATE_SIZE],
 }
 
+// Generate the outputs for a given preimage
 fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field; STATE_SIZE] {
     let mut outputs = [Field::ZERO; STATE_SIZE];
-
     let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
     assert_eq!(instance.get_t(), STATE_SIZE);
-    let mut input = Vec::with_capacity(STATE_SIZE);
-    for i in 0..STATE_SIZE {
-        input.push(FpGoldiLocks::from(preimage[i].to_canonical_u64()));
-    }
+
+    let input = preimage
+        .iter()
+        .map(|i| FpGoldiLocks::from(i.to_canonical_u64()))
+        .collect::<Vec<_>>();
     let perm = instance.permutation(&input);
+
     for i in 0..STATE_SIZE {
         outputs[i] = Field::from_noncanonical_biguint(BigUint::from_bytes_le(
             &perm[i].into_bigint().to_bytes_le(),
         ));
     }
-
     outputs
 }
 
-// Function to generate Poseidon2 trace
-pub fn generate_poseidon2_trace<Field: RichField>(
-    step_rows: Vec<Row<Field>>,
-) -> Result<[Vec<Field>; NUM_COLS], String> {
+// Function to generate the Poseidon2 trace
+pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
     let trace_len = step_rows.len();
-    let mut trace: Vec<Vec<Field>> = vec![vec![Field::ZERO; trace_len]; NUM_COLS];
+    let mut trace: Vec<Vec<F>> = vec![vec![F::ZERO; trace_len]; NUM_COLS];
 
     for (i, row) in step_rows.iter().enumerate() {
         for j in 0..STATE_SIZE {
@@ -49,11 +48,11 @@ pub fn generate_poseidon2_trace<Field: RichField>(
         }
     }
 
-    trace.try_into().map_err(|trace_vector: Vec<Vec<Field>>| {
-        format!(
+    trace.try_into().unwrap_or_else(|v: Vec<Vec<F>>| {
+        panic!(
             "Expected a Vec of length {} but it was {}",
             NUM_COLS,
-            trace_vector.len()
+            v.len()
         )
     })
 }
@@ -62,7 +61,7 @@ pub fn generate_poseidon2_trace<Field: RichField>(
 mod test {
     use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
     use crate::generation::Row;
-    use plonky2::field::types::{Field, PrimeField64, Sample};
+    use plonky2::field::types::{PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
@@ -77,29 +76,30 @@ mod test {
         let mut step_rows = Vec::with_capacity(num_rows);
 
         for _ in 0..num_rows {
-            let mut preimage = [F::ZERO; STATE_SIZE];
-            for i in 0..STATE_SIZE {
-                preimage[i] = F::rand();
-            }
-
-            step_rows.push(Row { preimage });
+            let preimage = (0..STATE_SIZE).map(|_| F::rand()).collect::<Vec<_>>();
+            step_rows.push(Row {
+                preimage: preimage.try_into().unwrap(),
+            });
         }
 
-        let result = super::generate_poseidon2_trace(step_rows.clone()).unwrap();
+        let trace = super::generate_poseidon2_trace(step_rows.clone());
 
         let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
         for i in 0..num_rows {
-            let mut input = Vec::with_capacity(STATE_SIZE);
-            for j in 0..STATE_SIZE {
-                input.push(FpGoldiLocks::from(
-                    step_rows[i].preimage[j].to_canonical_u64(),
-                ));
-            }
+            let input = step_rows[i]
+                .preimage
+                .iter()
+                .map(|x| FpGoldiLocks::from(x.to_canonical_u64()))
+                .collect::<Vec<_>>();
             let perm = instance.permutation(&input);
+
             for j in 0..STATE_SIZE {
+                let expected_val =
+                    FpGoldiLocks::from(trace[i][COL_OUTPUT_START + j].to_canonical_u64());
                 assert_eq!(
-                    perm[j],
-                    FpGoldiLocks::from(result[i][COL_OUTPUT_START + j].to_canonical_u64())
+                    perm[j], expected_val,
+                    "Mismatch at row {}, position {}",
+                    i, j
                 );
             }
         }
