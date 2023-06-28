@@ -1,11 +1,35 @@
 use crate::columns::{NUM_COLS, STATE_SIZE};
+use num::bigint::BigUint;
 use plonky2::hash::hash_types::RichField;
 use std::convert::TryInto;
+use zkhash::ark_ff::{BigInteger, PrimeField};
+use zkhash::fields::goldilocks::FpGoldiLocks;
+use zkhash::poseidon2::poseidon2::Poseidon2;
+use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
 #[derive(Debug, Clone, Default)]
 // A row of the preimage
 pub struct Row<Field: RichField> {
     preimage: [Field; STATE_SIZE],
+}
+
+fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field; STATE_SIZE] {
+    let mut outputs = [Field::ZERO; STATE_SIZE];
+
+    let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
+    assert_eq!(instance.get_t(), STATE_SIZE);
+    let mut input = Vec::with_capacity(STATE_SIZE);
+    for i in 0..STATE_SIZE {
+        input.push(FpGoldiLocks::from(preimage[i].to_canonical_u64()));
+    }
+    let perm = instance.permutation(&input);
+    for i in 0..STATE_SIZE {
+        outputs[i] = Field::from_noncanonical_biguint(BigUint::from_bytes_le(
+            &perm[i].into_bigint().to_bytes_le(),
+        ));
+    }
+
+    outputs
 }
 
 // Function to generate Poseidon2 trace
