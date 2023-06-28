@@ -1,4 +1,4 @@
-use crate::columns::{NUM_COLS, STATE_SIZE};
+use crate::columns::{COL_INPUT_START, NUM_COLS, STATE_SIZE};
 use num::bigint::BigUint;
 use plonky2::hash::hash_types::RichField;
 use std::convert::TryInto;
@@ -39,6 +39,16 @@ pub fn generate_poseidon2_trace<Field: RichField>(
     let trace_len = step_rows.len();
     let mut trace: Vec<Vec<Field>> = vec![vec![Field::ZERO; trace_len]; NUM_COLS];
 
+    for (i, row) in step_rows.iter().enumerate() {
+        for j in 0..STATE_SIZE {
+            trace[i][COL_INPUT_START + j] = row.preimage[j];
+        }
+        let outputs = generate_outputs(&row.preimage);
+        for j in 0..STATE_SIZE {
+            trace[i][COL_INPUT_START + STATE_SIZE + j] = outputs[j];
+        }
+    }
+
     trace.try_into().map_err(|trace_vector: Vec<Vec<Field>>| {
         format!(
             "Expected a Vec of length {} but it was {}",
@@ -50,10 +60,12 @@ pub fn generate_poseidon2_trace<Field: RichField>(
 
 #[cfg(test)]
 mod test {
-    use crate::columns::STATE_SIZE;
+    use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
     use crate::generation::Row;
-    use plonky2::field::types::{Field, Sample};
+    use plonky2::field::types::{Field, PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use zkhash::fields::goldilocks::FpGoldiLocks;
+    use zkhash::poseidon2::poseidon2::Poseidon2;
 
     #[test]
     fn generate_poseidon2_trace() {
@@ -73,7 +85,23 @@ mod test {
             step_rows.push(Row { preimage });
         }
 
-        let result = super::generate_poseidon2_trace(step_rows);
-        assert!(result.is_ok());
+        let result = super::generate_poseidon2_trace(step_rows.clone()).unwrap();
+
+        let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
+        for i in 0..num_rows {
+            let mut input = Vec::with_capacity(STATE_SIZE);
+            for j in 0..STATE_SIZE {
+                input.push(FpGoldiLocks::from(
+                    step_rows[i].preimage[j].to_canonical_u64(),
+                ));
+            }
+            let perm = instance.permutation(&input);
+            for j in 0..STATE_SIZE {
+                assert_eq!(
+                    perm[j],
+                    FpGoldiLocks::from(result[i][COL_OUTPUT_START + j].to_canonical_u64())
+                );
+            }
+        }
     }
 }
