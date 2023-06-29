@@ -10,7 +10,7 @@ use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PAR
 // Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
 pub struct Row<Field: RichField> {
-    preimage: [Field; STATE_SIZE],
+    pub(crate) preimage: [Field; STATE_SIZE],
 }
 
 /// Pad the trace to a power of 2.
