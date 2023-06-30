@@ -1,4 +1,5 @@
 use crate::columns::{NUM_COLS, STATE_SIZE};
+use num::BigUint;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::field::polynomial::PolynomialValues;
@@ -9,6 +10,9 @@ use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsume
 use starky::stark::Stark;
 use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::marker::PhantomData;
+use zkhash::ark_ff::{BigInteger, PrimeField};
+use zkhash::fields::goldilocks::FpGoldiLocks;
+use zkhash::poseidon2::poseidon2_instance_goldilocks::RC8;
 
 const M4: [[usize; 4]; 4] = [
     [5, 7, 1, 3], //
@@ -16,6 +20,18 @@ const M4: [[usize; 4]; 4] = [
     [1, 3, 5, 7], //
     [1, 1, 4, 6],
 ];
+
+fn scalar_to_fe<F: RichField + Extendable<D>, const D: usize, FE, const D2: usize, PF: PrimeField>(
+    scalar: PF,
+) -> FE
+where
+    FE: FieldExtension<D2, BaseField = F>,
+{
+    FE::from_canonical_u64(
+        F::from_noncanonical_biguint(BigUint::from_bytes_le(&scalar.into_bigint().to_bytes_le()))
+            .to_canonical_u64(),
+    )
+}
 
 // linear layer (degree = 1)
 fn matmul_external8_constraints<
@@ -50,6 +66,25 @@ where
     }
     for i in 0..8 {
         out[i] = out[i] + stored[i % 4];
+    }
+
+    out
+}
+
+// degree: 1
+fn add_rc_constraints<F: RichField + Extendable<D>, const D: usize, FE, P, const D2: usize>(
+    state: &[P; 8],
+    r: usize,
+) -> [P; 8]
+where
+    FE: FieldExtension<D2, BaseField = F>,
+    P: PackedField<Scalar = FE>,
+{
+    assert_eq!(STATE_SIZE, 8);
+    let mut out = [P::ZEROS; 8];
+
+    for i in 0..8 {
+        out[i] = state[i] + scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(RC8[r][i]);
     }
 
     out
@@ -118,10 +153,10 @@ mod tests {
     use std::marker::PhantomData;
 
     #[derive(Copy, Clone, Default)]
-    pub struct LinerLayerStark<F, const D: usize> {
+    pub struct PoseidonTestStark<F, const D: usize> {
         pub _f: PhantomData<F>,
     }
-    impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for LinerLayerStark<F, D> {
+    impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PoseidonTestStark<F, D> {
         const COLUMNS: usize = NUM_COLS;
         const PUBLIC_INPUTS: usize = 0;
 
@@ -135,6 +170,7 @@ mod tests {
         {
             let lv = vars.local_values;
             let out = super::matmul_external8_constraints(lv[0..8].try_into().unwrap());
+            let out = super::add_rc_constraints(&out, 0);
             for i in 0..8 {
                 yield_constr.constraint(out[i] - lv[8 + i]);
             }
@@ -155,11 +191,11 @@ mod tests {
     }
 
     #[test]
-    fn matmul_external8_constraints() -> Result<()> {
+    fn poseidon2_constraints() -> Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
-        type S = LinerLayerStark<F, D>;
+        type S = PoseidonTestStark<F, D>;
         let mut config = StarkConfig::standard_fast_config();
         config.fri_config.cap_height = 0;
 
@@ -176,14 +212,14 @@ mod tests {
 
         let stark = S::default();
         let mut trace = generate_poseidon2_trace(step_rows);
-        trace[8][0] = F::from_canonical_usize(166);
-        trace[9][0] = F::from_canonical_usize(117);
-        trace[10][0] = F::from_canonical_usize(214);
-        trace[11][0] = F::from_canonical_usize(165);
-        trace[12][0] = F::from_canonical_usize(230);
-        trace[13][0] = F::from_canonical_usize(165);
-        trace[14][0] = F::from_canonical_usize(278);
-        trace[15][0] = F::from_canonical_usize(213);
+        trace[8][0] = F::from_canonical_u64(15949291268843349631);
+        trace[9][0] = F::from_canonical_u64(14644164809401935040);
+        trace[10][0] = F::from_canonical_u64(18420360874837380530);
+        trace[11][0] = F::from_canonical_u64(4756469047455716499);
+        trace[12][0] = F::from_canonical_u64(8685499049481102345);
+        trace[13][0] = F::from_canonical_u64(3799221349720045532);
+        trace[14][0] = F::from_canonical_u64(13676397835037158208);
+        trace[15][0] = F::from_canonical_u64(6566439050423619848);
         let trace_poly_values = trace_to_poly_values(trace);
 
         let proof = prove::<F, C, S, D>(

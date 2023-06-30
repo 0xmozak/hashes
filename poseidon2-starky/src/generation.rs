@@ -7,6 +7,10 @@ use zkhash::fields::goldilocks::FpGoldiLocks;
 use zkhash::poseidon2::poseidon2::Poseidon2;
 use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
+pub(crate) fn scalar_to_field<F: RichField, F2: PrimeField>(scalar: &F2) -> F {
+    F::from_noncanonical_biguint(BigUint::from_bytes_le(&scalar.into_bigint().to_bytes_le()))
+}
+
 // Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
 pub struct Row<Field: RichField> {
@@ -39,9 +43,7 @@ fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field;
     let perm = instance.permutation(&input);
 
     for i in 0..STATE_SIZE {
-        outputs[i] = Field::from_noncanonical_biguint(BigUint::from_bytes_le(
-            &perm[i].into_bigint().to_bytes_le(),
-        ));
+        outputs[i] = scalar_to_field(&perm[i]);
     }
     outputs
 }
