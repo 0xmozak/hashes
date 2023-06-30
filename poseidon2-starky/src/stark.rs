@@ -1,4 +1,4 @@
-use crate::columns::{NUM_COLS, STATE_SIZE};
+use crate::columns::{NUM_COLS, SBOX_DEGREE, STATE_SIZE};
 use num::BigUint;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
@@ -90,6 +90,24 @@ where
     out
 }
 
+// degree: 7
+fn sbox_p_constraints<F: RichField + Extendable<D>, const D: usize, FE, P, const D2: usize>(
+    state: &P,
+) -> P
+where
+    FE: FieldExtension<D2, BaseField = F>,
+    P: PackedField<Scalar = FE>,
+{
+    assert_eq!(STATE_SIZE, 8);
+    let mut out = P::ONES;
+
+    for _ in 0..SBOX_DEGREE {
+        out = out * *state;
+    }
+
+    out
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct Poseidon2Stark<F, const D: usize> {
     pub _f: PhantomData<F>,
@@ -169,15 +187,18 @@ mod tests {
             P: PackedField<Scalar = FE>,
         {
             let lv = vars.local_values;
-            let out = super::matmul_external8_constraints(lv[0..8].try_into().unwrap());
-            let out = super::add_rc_constraints(&out, 0);
+            let mut out = super::matmul_external8_constraints(lv[0..8].try_into().unwrap());
+            out = super::add_rc_constraints(&out, 0);
+            for i in 0..8 {
+                out[i] = super::sbox_p_constraints(&out[i]);
+            }
             for i in 0..8 {
                 yield_constr.constraint(out[i] - lv[8 + i]);
             }
         }
 
         fn constraint_degree(&self) -> usize {
-            1
+            7
         }
 
         fn eval_ext_circuit(
@@ -198,6 +219,7 @@ mod tests {
         type S = PoseidonTestStark<F, D>;
         let mut config = StarkConfig::standard_fast_config();
         config.fri_config.cap_height = 0;
+        config.fri_config.rate_bits = 3;
 
         let num_rows = 1;
         let mut step_rows = Vec::with_capacity(num_rows);
@@ -212,14 +234,16 @@ mod tests {
 
         let stark = S::default();
         let mut trace = generate_poseidon2_trace(step_rows);
-        trace[8][0] = F::from_canonical_u64(15949291268843349631);
-        trace[9][0] = F::from_canonical_u64(14644164809401935040);
-        trace[10][0] = F::from_canonical_u64(18420360874837380530);
-        trace[11][0] = F::from_canonical_u64(4756469047455716499);
-        trace[12][0] = F::from_canonical_u64(8685499049481102345);
-        trace[13][0] = F::from_canonical_u64(3799221349720045532);
-        trace[14][0] = F::from_canonical_u64(13676397835037158208);
-        trace[15][0] = F::from_canonical_u64(6566439050423619848);
+        for row in 0..num_rows {
+            trace[8][row] = F::from_canonical_u64(4924480480635527917);
+            trace[9][row] = F::from_canonical_u64(7328260706673212971);
+            trace[10][row] = F::from_canonical_u64(12769208979081050669);
+            trace[11][row] = F::from_canonical_u64(226507612748720379);
+            trace[12][row] = F::from_canonical_u64(1452606391015137905);
+            trace[13][row] = F::from_canonical_u64(13954454011491297451);
+            trace[14][row] = F::from_canonical_u64(12425154049474751493);
+            trace[15][row] = F::from_canonical_u64(14960278433617001970);
+        }
         let trace_poly_values = trace_to_poly_values(trace);
 
         let proof = prove::<F, C, S, D>(
