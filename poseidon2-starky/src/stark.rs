@@ -192,6 +192,7 @@ mod tests {
             for i in 0..8 {
                 out[i] = super::sbox_p_constraints(&out[i]);
             }
+            out = super::matmul_external8_constraints(&out);
             for i in 0..8 {
                 yield_constr.constraint(out[i] - lv[8 + i]);
             }
@@ -235,14 +236,14 @@ mod tests {
         let stark = S::default();
         let mut trace = generate_poseidon2_trace(step_rows);
         for row in 0..num_rows {
-            trace[8][row] = F::from_canonical_u64(4924480480635527917);
-            trace[9][row] = F::from_canonical_u64(7328260706673212971);
-            trace[10][row] = F::from_canonical_u64(12769208979081050669);
-            trace[11][row] = F::from_canonical_u64(226507612748720379);
-            trace[12][row] = F::from_canonical_u64(1452606391015137905);
-            trace[13][row] = F::from_canonical_u64(13954454011491297451);
-            trace[14][row] = F::from_canonical_u64(12425154049474751493);
-            trace[15][row] = F::from_canonical_u64(14960278433617001970);
+            trace[8][row] = F::from_canonical_u64(8946724470812695683);
+            trace[9][row] = F::from_canonical_u64(11994570653118230379);
+            trace[10][row] = F::from_canonical_u64(7463783821078456428);
+            trace[11][row] = F::from_canonical_u64(7545431721139220009);
+            trace[12][row] = F::from_canonical_u64(8040988411777545296);
+            trace[13][row] = F::from_canonical_u64(15360461875977990984);
+            trace[14][row] = F::from_canonical_u64(14606146327471289187);
+            trace[15][row] = F::from_canonical_u64(5492435796048485714);
         }
         let trace_poly_values = trace_to_poly_values(trace);
 
