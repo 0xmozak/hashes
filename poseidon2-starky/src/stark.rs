@@ -151,9 +151,9 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 
 #[cfg(test)]
 mod tests {
-    use crate::columns::{NUM_COLS, STATE_SIZE};
+    use crate::columns::{NUM_COLS, ROUNDS_F, STATE_SIZE};
     use crate::generation::{generate_poseidon2_trace, Row};
-    use crate::stark::trace_to_poly_values;
+    use crate::stark::{Poseidon2Stark, trace_to_poly_values};
     use anyhow::Result;
     use plonky2::field::extension::{Extendable, FieldExtension};
     use plonky2::field::packed::PackedField;
@@ -169,6 +169,7 @@ mod tests {
     use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
     use starky::verifier::verify_stark_proof;
     use std::marker::PhantomData;
+    use starky::stark_testing::test_stark_low_degree;
 
     #[derive(Copy, Clone, Default)]
     pub struct PoseidonTestStark<F, const D: usize> {
@@ -198,10 +199,6 @@ mod tests {
             }
         }
 
-        fn constraint_degree(&self) -> usize {
-            7
-        }
-
         fn eval_ext_circuit(
             &self,
             _builder: &mut CircuitBuilder<F, D>,
@@ -209,6 +206,10 @@ mod tests {
             _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
         ) {
             unimplemented!()
+        }
+
+        fn constraint_degree(&self) -> usize {
+            7
         }
     }
 
@@ -255,5 +256,17 @@ mod tests {
             &mut TimingTree::default(),
         )?;
         verify_stark_proof(stark, proof, &config)
+    }
+
+    #[test]
+    fn poseidon2_stark_degree() -> Result<()> {
+        const D: usize = 2;
+        type C = PoseidonGoldilocksConfig;
+        type F = <C as GenericConfig<D>>::F;
+        type S = PoseidonTestStark<F, D>;
+
+        let num_rows = 1 << 5;
+        let stark = S::default();
+        test_stark_low_degree(stark)
     }
 }
