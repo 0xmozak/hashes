@@ -1,4 +1,6 @@
 use crate::columns::{NUM_COLS, SBOX_DEGREE, STATE_SIZE};
+use crate::poseidon2::RC8;
+use ark_ff::{BigInteger, PrimeField};
 use num::BigUint;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
@@ -10,9 +12,7 @@ use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsume
 use starky::stark::Stark;
 use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::marker::PhantomData;
-use zkhash::ark_ff::{BigInteger, PrimeField};
 use zkhash::fields::goldilocks::FpGoldiLocks;
-use zkhash::poseidon2::poseidon2_instance_goldilocks::RC8;
 
 const M4: [[usize; 4]; 4] = [
     [5, 7, 1, 3], //
