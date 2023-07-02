@@ -153,7 +153,7 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 mod tests {
     use crate::columns::{NUM_COLS, ROUNDS_F, STATE_SIZE};
     use crate::generation::{generate_poseidon2_trace, Row};
-    use crate::stark::{Poseidon2Stark, trace_to_poly_values};
+    use crate::stark::{trace_to_poly_values, Poseidon2Stark};
     use anyhow::Result;
     use plonky2::field::extension::{Extendable, FieldExtension};
     use plonky2::field::packed::PackedField;
@@ -166,10 +166,10 @@ mod tests {
     use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
     use starky::prover::prove;
     use starky::stark::Stark;
+    use starky::stark_testing::test_stark_low_degree;
     use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
     use starky::verifier::verify_stark_proof;
     use std::marker::PhantomData;
-    use starky::stark_testing::test_stark_low_degree;
 
     #[derive(Copy, Clone, Default)]
     pub struct PoseidonTestStark<F, const D: usize> {

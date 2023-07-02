@@ -99,7 +99,9 @@ mod test {
         }
 
         let trace = super::generate_poseidon2_trace(step_rows.clone());
-        assert_eq!(trace.len(), 16);
+        for i in 0..trace.len() {
+            assert_eq!(trace[i].len(), 16);
+        }
 
         let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
         for i in 0..num_rows {
