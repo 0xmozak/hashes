@@ -77,10 +77,11 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
 mod test {
     use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
     use crate::generation::Row;
-    use crate::poseidon2::Poseidon2;
-    use plonky2::field::types::{PrimeField64, Sample};
+    use plonky2::field::types::{Field, PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use zkhash::fields::goldilocks::FpGoldiLocks;
+    use zkhash::poseidon2::poseidon2::Poseidon2;
+    use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
     #[test]
     fn generate_poseidon2_trace() {
@@ -103,7 +104,7 @@ mod test {
             assert_eq!(trace[i].len(), 16);
         }
 
-        let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
+        let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
         for i in 0..num_rows {
             let input = step_rows[i]
                 .preimage

@@ -83,7 +83,6 @@ impl<F: PrimeField> Poseidon2<F> {
         self.matmul_external(&mut current_state);
 
         for r in 0..self.params.rounds_f_beginning {
-            let r = 0;
             current_state = self.add_rc(&current_state, &self.params.round_constants[r]);
             current_state = self.sbox(&current_state);
             self.matmul_external(&mut current_state);
@@ -104,11 +103,11 @@ impl<F: PrimeField> Poseidon2<F> {
         current_state
     }
 
-    fn sbox(&self, input: &[F]) -> Vec<F> {
+    pub(crate) fn sbox(&self, input: &[F]) -> Vec<F> {
         input.iter().map(|el| self.sbox_p(el)).collect()
     }
 
-    fn sbox_p(&self, input: &F) -> F {
+    pub(crate) fn sbox_p(&self, input: &F) -> F {
         let mut input2 = *input;
         input2.square_in_place();
 
@@ -171,7 +170,7 @@ impl<F: PrimeField> Poseidon2<F> {
         }
     }
 
-    fn matmul_external(&self, input: &mut [F]) {
+    pub(crate) fn matmul_external(&self, input: &mut [F]) {
         let t = self.params.t;
         match t {
             2 => {
@@ -217,7 +216,7 @@ impl<F: PrimeField> Poseidon2<F> {
         }
     }
 
-    fn matmul_internal(&self, input: &mut [F], mat_internal_diag_m_1: &[F]) {
+    pub(crate) fn matmul_internal(&self, input: &mut [F], mat_internal_diag_m_1: &[F]) {
         let t = self.params.t;
 
         match t {
@@ -262,7 +261,7 @@ impl<F: PrimeField> Poseidon2<F> {
         }
     }
 
-    fn add_rc(&self, input: &[F], rc: &[F]) -> Vec<F> {
+    pub(crate) fn add_rc(&self, input: &[F], rc: &[F]) -> Vec<F> {
         input
             .iter()
             .zip(rc.iter())
