@@ -149,7 +149,9 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
 mod test {
     use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
     use crate::generation::{
-        field_to_scalar, field_to_scalar_vec, scalar_to_field, scalar_to_field_vec, Row,
+        field_to_scalar, field_to_scalar_vec, generate_1st_full_round_state,
+        generate_2st_full_round_state, generate_outputs, generate_partial_round_state,
+        scalar_to_field, scalar_to_field_vec, Row,
     };
     use plonky2::field::goldilocks_field::GoldilocksField;
     use plonky2::field::types::{Field, PrimeField64, Sample};
@@ -158,6 +160,10 @@ mod test {
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
     use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
+
+    const D: usize = 2;
+    type C = PoseidonGoldilocksConfig;
+    type F = <C as GenericConfig<D>>::F;
 
     #[test]
     fn test_field_conversion_vec() {
@@ -168,11 +174,20 @@ mod test {
     }
 
     #[test]
-    fn generate_poseidon2_trace() {
-        const D: usize = 2;
-        type C = PoseidonGoldilocksConfig;
-        type F = <C as GenericConfig<D>>::F;
+    fn test_rounds_generation() {
+        let preimage = (0..STATE_SIZE).map(|_| F::rand()).collect::<Vec<_>>();
+        let output0: Vec<[F; STATE_SIZE]> =
+            generate_1st_full_round_state(&preimage.clone().try_into().unwrap());
+        let output1: Vec<[F; STATE_SIZE]> =
+            generate_partial_round_state(output0.last().unwrap().try_into().unwrap());
+        let output2: Vec<[F; STATE_SIZE]> =
+            generate_2st_full_round_state(output1.last().unwrap().try_into().unwrap());
+        let expected_output = generate_outputs(&preimage.try_into().unwrap());
+        assert_eq!(expected_output, *output2.last().unwrap());
+    }
 
+    #[test]
+    fn generate_poseidon2_trace() {
         let num_rows = 12;
         let mut step_rows = Vec::with_capacity(num_rows);
 
