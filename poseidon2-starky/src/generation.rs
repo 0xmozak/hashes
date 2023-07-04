@@ -1,14 +1,27 @@
 use crate::columns::{COL_INPUT_START, COL_OUTPUT_START, NUM_COLS, STATE_SIZE};
 use crate::poseidon2::Poseidon2;
 use crate::poseidon2::POSEIDON2_GOLDILOCKS_8_PARAMS;
-use ark_ff::{BigInteger, PrimeField};
+use ark_ff::{BigInt, BigInteger, PrimeField};
 use num::bigint::BigUint;
 use plonky2::hash::hash_types::RichField;
 use std::convert::TryInto;
+use std::ops::AddAssign;
 use zkhash::fields::goldilocks::FpGoldiLocks;
 
-pub(crate) fn scalar_to_field<F: RichField, F2: PrimeField>(scalar: &F2) -> F {
-    F::from_noncanonical_biguint(BigUint::from_bytes_le(&scalar.into_bigint().to_bytes_le()))
+pub(crate) fn scalar_to_field<RF: RichField, PF: PrimeField>(scalar: &PF) -> RF {
+    RF::from_noncanonical_biguint(BigUint::from_bytes_le(&scalar.into_bigint().to_bytes_le()))
+}
+
+pub(crate) fn scalar_to_field_vec<RF: RichField, PF: PrimeField>(scalar: &[PF]) -> Vec<RF> {
+    scalar.iter().map(|s| scalar_to_field(s)).collect()
+}
+
+pub(crate) fn field_to_scalar<RF: RichField, PF: PrimeField>(field: &RF) -> PF {
+    PF::from_le_bytes_mod_order(&field.to_canonical_biguint().to_bytes_le())
+}
+
+pub(crate) fn field_to_scalar_vec<RF: RichField, PF: PrimeField>(field: &[RF]) -> Vec<PF> {
+    field.iter().map(|f| field_to_scalar(f)).collect()
 }
 
 // Represent a row of the preimage
@@ -30,16 +43,75 @@ fn pad_trace<F: RichField>(mut trace: Vec<Vec<F>>) -> Vec<Vec<F>> {
     trace
 }
 
+fn generate_1st_full_round_state<Field: RichField>(
+    preimage: &[Field; STATE_SIZE],
+) -> Vec<[Field; STATE_SIZE]> {
+    let mut outputs = Vec::new();
+    let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
+    assert_eq!(instance.get_t(), STATE_SIZE);
+
+    let mut current_state = field_to_scalar_vec(preimage);
+
+    // Linear layer at beginning
+    instance.matmul_external(&mut current_state);
+
+    for r in 0..instance.params.rounds_f_beginning {
+        current_state = instance.add_rc(&current_state, &instance.params.round_constants[r]);
+        current_state = instance.sbox(&current_state);
+        instance.matmul_external(&mut current_state);
+        outputs.push(scalar_to_field_vec(&current_state).try_into().unwrap());
+    }
+
+    outputs
+}
+
+fn generate_partial_round_state<Field: RichField>(
+    last_rount_output: &[Field; STATE_SIZE],
+) -> Vec<[Field; STATE_SIZE]> {
+    let mut outputs = Vec::new();
+    let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
+    assert_eq!(instance.get_t(), STATE_SIZE);
+
+    let mut current_state: Vec<FpGoldiLocks> = field_to_scalar_vec(last_rount_output);
+
+    let p_end = instance.params.rounds_f_beginning + instance.params.rounds_p;
+    for r in instance.params.rounds_f_beginning..p_end {
+        current_state[0].add_assign(&instance.params.round_constants[r][0]);
+        current_state[0] = instance.sbox_p(&current_state[0]);
+        instance.matmul_internal(&mut current_state, &instance.params.mat_internal_diag_m_1);
+        outputs.push(scalar_to_field_vec(&current_state).try_into().unwrap());
+    }
+
+    outputs
+}
+
+fn generate_2st_full_round_state<Field: RichField>(
+    last_rount_output: &[Field; STATE_SIZE],
+) -> Vec<[Field; STATE_SIZE]> {
+    let mut outputs = Vec::new();
+    let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
+    assert_eq!(instance.get_t(), STATE_SIZE);
+
+    let mut current_state = field_to_scalar_vec(last_rount_output);
+
+    let p_end = instance.params.rounds_f_beginning + instance.params.rounds_p;
+    for r in p_end..instance.params.rounds {
+        current_state = instance.add_rc(&current_state, &instance.params.round_constants[r]);
+        current_state = instance.sbox(&current_state);
+        instance.matmul_external(&mut current_state);
+        outputs.push(scalar_to_field_vec(&current_state).try_into().unwrap());
+    }
+
+    outputs
+}
+
 // Generate the outputs for a given preimage
 fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field; STATE_SIZE] {
     let mut outputs = [Field::ZERO; STATE_SIZE];
     let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
     assert_eq!(instance.get_t(), STATE_SIZE);
 
-    let input = preimage
-        .iter()
-        .map(|i| FpGoldiLocks::from(i.to_canonical_u64()))
-        .collect::<Vec<_>>();
+    let input = field_to_scalar_vec(preimage);
     let perm = instance.permutation(&input);
 
     for i in 0..STATE_SIZE {
@@ -76,12 +148,24 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
 #[cfg(test)]
 mod test {
     use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
-    use crate::generation::Row;
+    use crate::generation::{
+        field_to_scalar, field_to_scalar_vec, scalar_to_field, scalar_to_field_vec, Row,
+    };
+    use plonky2::field::goldilocks_field::GoldilocksField;
     use plonky2::field::types::{Field, PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use zkhash::fields::bls12::FqConfig;
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
     use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
+
+    #[test]
+    fn test_field_conversion_vec() {
+        let fields: Vec<GoldilocksField> = (0..16).map(|_| GoldilocksField::rand()).collect();
+        let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
+        let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
+        assert_eq!(fields, fields2);
+    }
 
     #[test]
     fn generate_poseidon2_trace() {
