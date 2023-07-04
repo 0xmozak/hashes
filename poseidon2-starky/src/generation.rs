@@ -1,4 +1,7 @@
-use crate::columns::{COL_INPUT_START, COL_OUTPUT_START, NUM_COLS, STATE_SIZE};
+use crate::columns::{
+    COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START, COL_INPUT_START,
+    COL_OUTPUT_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P, STATE_SIZE,
+};
 use crate::poseidon2::Poseidon2;
 use crate::poseidon2::POSEIDON2_GOLDILOCKS_8_PARAMS;
 use ark_ff::{BigInt, BigInteger, PrimeField};
@@ -132,6 +135,25 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
         let outputs = generate_outputs(&row.preimage);
         for j in 0..STATE_SIZE {
             trace[COL_OUTPUT_START + j][i] = outputs[j];
+        }
+
+        // Generate the full round states
+        let first_full_round_state = generate_1st_full_round_state(&row.preimage);
+        let partial_round_state = generate_partial_round_state(
+            first_full_round_state.last().unwrap().try_into().unwrap(),
+        );
+        let second_full_round_state =
+            generate_2st_full_round_state(partial_round_state.last().unwrap().try_into().unwrap());
+        for j in 0..ROUNDS_F {
+            for k in 0..STATE_SIZE {
+                trace[COL_1ST_FULLROUND_STATE_START + j * STATE_SIZE + k][i] =
+                    first_full_round_state[j][k];
+                trace[COL_2ND_FULLROUND_STATE_START + j * STATE_SIZE + k][i] =
+                    second_full_round_state[j][k];
+            }
+        }
+        for j in 0..ROUNDS_P {
+            trace[COL_PARTIAL_ROUND_STATE_START + j][i] = partial_round_state[j][0];
         }
     }
 

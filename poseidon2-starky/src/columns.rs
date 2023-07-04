@@ -24,4 +24,4 @@ pub(crate) const COL_PARTIAL_ROUND_STATE_START: usize =
 pub(crate) const COL_2ND_FULLROUND_STATE_START: usize = COL_PARTIAL_ROUND_STATE_START + ROUNDS_P;
 
 // The total number of columns
-pub(crate) const NUM_COLS: usize = COL_OUTPUT_START + STATE_SIZE * ROUNDS_F;
+pub(crate) const NUM_COLS: usize = COL_2ND_FULLROUND_STATE_START + STATE_SIZE * ROUNDS_F;
