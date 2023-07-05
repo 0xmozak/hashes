@@ -1,6 +1,7 @@
 use crate::columns::{
     COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START, COL_INPUT_START,
-    COL_OUTPUT_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P, STATE_SIZE,
+    COL_OUTPUT_START, COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS,
+    ROUNDS_F, ROUNDS_P, STATE_SIZE,
 };
 use crate::poseidon2::Poseidon2;
 use crate::poseidon2::POSEIDON2_GOLDILOCKS_8_PARAMS;
@@ -154,6 +155,9 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
         }
         for j in 0..ROUNDS_P {
             trace[COL_PARTIAL_ROUND_STATE_START + j][i] = partial_round_state[j][0];
+        }
+        for j in 0..STATE_SIZE {
+            trace[COL_PARTIAL_ROUND_END_STATE_START + j][i] = partial_round_state[ROUNDS_P - 1][j];
         }
     }
 

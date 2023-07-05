@@ -181,8 +181,9 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 #[cfg(test)]
 mod tests {
     use crate::columns::{
-        COL_1ST_FULLROUND_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P,
-        STATE_SIZE,
+        COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START, COL_OUTPUT_START,
+        COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F,
+        ROUNDS_P, STATE_SIZE,
     };
     use crate::generation::{generate_poseidon2_trace, Row};
     use crate::poseidon2::RC8;
@@ -250,7 +251,24 @@ mod tests {
             }
 
             for i in 0..STATE_SIZE {
-                yield_constr.constraint(state[i] - lv[8 + i]);
+                yield_constr.constraint(state[i] - lv[COL_PARTIAL_ROUND_END_STATE_START + i]);
+                state[i] = lv[COL_PARTIAL_ROUND_END_STATE_START + i];
+            }
+
+            // last full rounds
+            for i in 0..ROUNDS_F {
+                let r = ROUNDS_F + ROUNDS_P + i;
+                state = super::add_rc_constraints(&state, r);
+                for j in 0..STATE_SIZE {
+                    state[j] = super::sbox_p_constraints(&state[j]);
+                }
+                state = super::matmul_external8_constraints(&state);
+                for j in 0..STATE_SIZE {
+                    yield_constr.constraint(
+                        state[j] - lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j],
+                    );
+                    state[j] = lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j];
+                }
             }
         }
 
@@ -292,14 +310,14 @@ mod tests {
         let stark = S::default();
         let mut trace = generate_poseidon2_trace(step_rows);
         for row in 0..num_rows {
-            trace[8][row] = F::from_canonical_u64(8819548283525844653);
-            trace[9][row] = F::from_canonical_u64(12228992105858652070);
-            trace[10][row] = F::from_canonical_u64(4861132991556502187);
-            trace[11][row] = F::from_canonical_u64(5587681080442376794);
-            trace[12][row] = F::from_canonical_u64(1339891673634421267);
-            trace[13][row] = F::from_canonical_u64(13568472719586988937);
-            trace[14][row] = F::from_canonical_u64(16342764561928125140);
-            trace[15][row] = F::from_canonical_u64(13652518956506335588);
+            trace[93][row] = F::from_canonical_u64(10577501287789148137);
+            trace[94][row] = F::from_canonical_u64(5800891928410257855);
+            trace[95][row] = F::from_canonical_u64(3854182729755511193);
+            trace[96][row] = F::from_canonical_u64(4756945600777909251);
+            trace[97][row] = F::from_canonical_u64(9336688369823211938);
+            trace[98][row] = F::from_canonical_u64(1172489469068085887);
+            trace[99][row] = F::from_canonical_u64(8853534953156950956);
+            trace[100][row] = F::from_canonical_u64(9128387040854318946);
         }
         let trace_poly_values = trace_to_poly_values(trace);
 
