@@ -1,4 +1,8 @@
-use crate::columns::{NUM_COLS, SBOX_DEGREE, STATE_SIZE};
+use crate::columns::{
+    COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START,
+    COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P,
+    SBOX_DEGREE, STATE_SIZE,
+};
 use crate::poseidon2::{MAT_DIAG8_M_1, RC8};
 use ark_ff::{BigInteger, PrimeField};
 use num::BigUint;
@@ -149,17 +153,61 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: StarkEvaluationVars<FE, P, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
-        _yield_constr: &mut ConstraintConsumer<P>,
+        yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>,
     {
         let lv = vars.local_values;
-        let _ = matmul_external8_constraints(lv[0..8].try_into().unwrap());
+        let mut state = matmul_external8_constraints(lv[0..8].try_into().unwrap());
+
+        // first full rounds
+        for r in 0..ROUNDS_F {
+            state = add_rc_constraints(&state, r);
+            for i in 0..STATE_SIZE {
+                state[i] = sbox_p_constraints(&state[i]);
+            }
+            state = matmul_external8_constraints(&state);
+            for i in 0..STATE_SIZE {
+                yield_constr
+                    .constraint(state[i] - lv[COL_1ST_FULLROUND_STATE_START + r * STATE_SIZE + i]);
+                state[i] = lv[COL_1ST_FULLROUND_STATE_START + r * STATE_SIZE + i];
+            }
+        }
+
+        // partial rounds
+        for i in 0..ROUNDS_P {
+            let r = ROUNDS_F + i;
+            state[0] = state[0] + scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(RC8[r][0]);
+            state[0] = sbox_p_constraints(&state[0]);
+            state = matmul_internal8_constraints(&state);
+            yield_constr.constraint(state[0] - lv[COL_PARTIAL_ROUND_STATE_START + i]);
+            state[0] = lv[COL_PARTIAL_ROUND_STATE_START + i];
+        }
+
+        for i in 0..STATE_SIZE {
+            yield_constr.constraint(state[i] - lv[COL_PARTIAL_ROUND_END_STATE_START + i]);
+            state[i] = lv[COL_PARTIAL_ROUND_END_STATE_START + i];
+        }
+
+        // last full rounds
+        for i in 0..ROUNDS_F {
+            let r = ROUNDS_F + ROUNDS_P + i;
+            state = add_rc_constraints(&state, r);
+            for j in 0..STATE_SIZE {
+                state[j] = sbox_p_constraints(&state[j]);
+            }
+            state = matmul_external8_constraints(&state);
+            for j in 0..STATE_SIZE {
+                yield_constr
+                    .constraint(state[j] - lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j]);
+                state[j] = lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j];
+            }
+        }
     }
 
     fn constraint_degree(&self) -> usize {
-        unimplemented!()
+        7
     }
 
     fn eval_ext_circuit(
@@ -180,145 +228,40 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 
 #[cfg(test)]
 mod tests {
-    use crate::columns::{
-        COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START, COL_OUTPUT_START,
-        COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F,
-        ROUNDS_P, STATE_SIZE,
-    };
+    use crate::columns::STATE_SIZE;
     use crate::generation::{generate_poseidon2_trace, Row};
-    use crate::poseidon2::RC8;
-    use crate::stark::FpGoldiLocks;
-    use crate::stark::{scalar_to_fe, trace_to_poly_values, Poseidon2Stark};
+    use crate::stark::{trace_to_poly_values, Poseidon2Stark};
     use anyhow::Result;
-    use plonky2::field::extension::{Extendable, FieldExtension};
-    use plonky2::field::packed::PackedField;
-    use plonky2::field::types::Field;
-    use plonky2::hash::hash_types::RichField;
-    use plonky2::plonk::circuit_builder::CircuitBuilder;
+    use plonky2::field::types::Sample;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use plonky2::util::timing::TimingTree;
     use starky::config::StarkConfig;
-    use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
     use starky::prover::prove;
-    use starky::stark::Stark;
     use starky::stark_testing::test_stark_low_degree;
-    use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
     use starky::verifier::verify_stark_proof;
-    use std::marker::PhantomData;
 
-    #[derive(Copy, Clone, Default)]
-    pub struct PoseidonTestStark<F, const D: usize> {
-        pub _f: PhantomData<F>,
-    }
-    impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PoseidonTestStark<F, D> {
-        const COLUMNS: usize = NUM_COLS;
-        const PUBLIC_INPUTS: usize = 0;
-
-        fn eval_packed_generic<FE, P, const D2: usize>(
-            &self,
-            vars: StarkEvaluationVars<FE, P, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
-            yield_constr: &mut ConstraintConsumer<P>,
-        ) where
-            FE: FieldExtension<D2, BaseField = F>,
-            P: PackedField<Scalar = FE>,
-        {
-            let lv = vars.local_values;
-            let mut state = super::matmul_external8_constraints(lv[0..8].try_into().unwrap());
-
-            // first full rounds
-            for r in 0..ROUNDS_F {
-                state = super::add_rc_constraints(&state, r);
-                for i in 0..STATE_SIZE {
-                    state[i] = super::sbox_p_constraints(&state[i]);
-                }
-                state = super::matmul_external8_constraints(&state);
-                for i in 0..STATE_SIZE {
-                    yield_constr.constraint(
-                        state[i] - lv[COL_1ST_FULLROUND_STATE_START + r * STATE_SIZE + i],
-                    );
-                    state[i] = lv[COL_1ST_FULLROUND_STATE_START + r * STATE_SIZE + i];
-                }
-            }
-
-            // partial rounds
-            for i in 0..ROUNDS_P {
-                let r = ROUNDS_F + i;
-                state[0] = state[0] + scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(RC8[r][0]);
-                state[0] = super::sbox_p_constraints(&state[0]);
-                state = super::matmul_internal8_constraints(&state);
-                yield_constr.constraint(state[0] - lv[COL_PARTIAL_ROUND_STATE_START + i]);
-                state[0] = lv[COL_PARTIAL_ROUND_STATE_START + i];
-            }
-
-            for i in 0..STATE_SIZE {
-                yield_constr.constraint(state[i] - lv[COL_PARTIAL_ROUND_END_STATE_START + i]);
-                state[i] = lv[COL_PARTIAL_ROUND_END_STATE_START + i];
-            }
-
-            // last full rounds
-            for i in 0..ROUNDS_F {
-                let r = ROUNDS_F + ROUNDS_P + i;
-                state = super::add_rc_constraints(&state, r);
-                for j in 0..STATE_SIZE {
-                    state[j] = super::sbox_p_constraints(&state[j]);
-                }
-                state = super::matmul_external8_constraints(&state);
-                for j in 0..STATE_SIZE {
-                    yield_constr.constraint(
-                        state[j] - lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j],
-                    );
-                    state[j] = lv[COL_2ND_FULLROUND_STATE_START + i * STATE_SIZE + j];
-                }
-            }
-        }
-
-        fn eval_ext_circuit(
-            &self,
-            _builder: &mut CircuitBuilder<F, D>,
-            _vars: StarkEvaluationTargets<D, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
-            _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
-        ) {
-            unimplemented!()
-        }
-
-        fn constraint_degree(&self) -> usize {
-            7
-        }
-    }
+    const D: usize = 2;
+    type C = PoseidonGoldilocksConfig;
+    type F = <C as GenericConfig<D>>::F;
+    type S = Poseidon2Stark<F, D>;
 
     #[test]
     fn poseidon2_constraints() -> Result<()> {
-        const D: usize = 2;
-        type C = PoseidonGoldilocksConfig;
-        type F = <C as GenericConfig<D>>::F;
-        type S = PoseidonTestStark<F, D>;
         let mut config = StarkConfig::standard_fast_config();
         config.fri_config.cap_height = 0;
-        config.fri_config.rate_bits = 3;
+        config.fri_config.rate_bits = 3; // to meet the constraint degree bound
 
-        let num_rows = 1;
+        let num_rows = 12;
         let mut step_rows = Vec::with_capacity(num_rows);
         for _ in 0..num_rows {
-            let preimage = (0..STATE_SIZE)
-                .map(|i| F::from_canonical_usize(i + 1))
-                .collect::<Vec<_>>();
+            let preimage = (0..STATE_SIZE).map(|_| F::rand()).collect::<Vec<_>>();
             step_rows.push(Row {
                 preimage: preimage.try_into().unwrap(),
             });
         }
 
         let stark = S::default();
-        let mut trace = generate_poseidon2_trace(step_rows);
-        for row in 0..num_rows {
-            trace[93][row] = F::from_canonical_u64(10577501287789148137);
-            trace[94][row] = F::from_canonical_u64(5800891928410257855);
-            trace[95][row] = F::from_canonical_u64(3854182729755511193);
-            trace[96][row] = F::from_canonical_u64(4756945600777909251);
-            trace[97][row] = F::from_canonical_u64(9336688369823211938);
-            trace[98][row] = F::from_canonical_u64(1172489469068085887);
-            trace[99][row] = F::from_canonical_u64(8853534953156950956);
-            trace[100][row] = F::from_canonical_u64(9128387040854318946);
-        }
+        let trace = generate_poseidon2_trace(step_rows);
         let trace_poly_values = trace_to_poly_values(trace);
 
         let proof = prove::<F, C, S, D>(
@@ -333,12 +276,6 @@ mod tests {
 
     #[test]
     fn poseidon2_stark_degree() -> Result<()> {
-        const D: usize = 2;
-        type C = PoseidonGoldilocksConfig;
-        type F = <C as GenericConfig<D>>::F;
-        type S = PoseidonTestStark<F, D>;
-
-        let num_rows = 1 << 5;
         let stark = S::default();
         test_stark_low_degree(stark)
     }

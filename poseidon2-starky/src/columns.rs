@@ -5,7 +5,6 @@ pub(crate) const SBOX_DEGREE: usize = 7;
 // Poseidon constants
 pub(crate) const ROUNDS_F: usize = 4;
 pub(crate) const ROUNDS_P: usize = 22;
-pub(crate) const ROUNDS: usize = ROUNDS_F * 2 + ROUNDS_P; // 30
 
 // The starting point of the column input
 pub(crate) const COL_INPUT_START: usize = 0;

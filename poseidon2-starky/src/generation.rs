@@ -5,7 +5,7 @@ use crate::columns::{
 };
 use crate::poseidon2::Poseidon2;
 use crate::poseidon2::POSEIDON2_GOLDILOCKS_8_PARAMS;
-use ark_ff::{BigInt, BigInteger, PrimeField};
+use ark_ff::{BigInteger, PrimeField};
 use num::bigint::BigUint;
 use plonky2::hash::hash_types::RichField;
 use std::convert::TryInto;
@@ -175,14 +175,12 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>
 mod test {
     use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
     use crate::generation::{
-        field_to_scalar, field_to_scalar_vec, generate_1st_full_round_state,
-        generate_2st_full_round_state, generate_outputs, generate_partial_round_state,
-        scalar_to_field, scalar_to_field_vec, Row,
+        field_to_scalar_vec, generate_1st_full_round_state, generate_2st_full_round_state,
+        generate_outputs, generate_partial_round_state, scalar_to_field_vec, Row,
     };
     use plonky2::field::goldilocks_field::GoldilocksField;
-    use plonky2::field::types::{Field, PrimeField64, Sample};
+    use plonky2::field::types::{PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-    use zkhash::fields::bls12::FqConfig;
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
     use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
