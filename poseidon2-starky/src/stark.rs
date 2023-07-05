@@ -3,7 +3,6 @@ use crate::columns::{
     COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P,
     SBOX_DEGREE, STATE_SIZE,
 };
-use crate::poseidon2::{MAT_DIAG8_M_1, RC8};
 use ark_ff::{BigInteger, PrimeField};
 use num::BigUint;
 use plonky2::field::extension::{Extendable, FieldExtension};
@@ -17,6 +16,7 @@ use starky::stark::Stark;
 use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::marker::PhantomData;
 use zkhash::fields::goldilocks::FpGoldiLocks;
+use zkhash::poseidon2::poseidon2_instance_goldilocks::{MAT_DIAG8_M_1, RC8};
 
 const M4: [[usize; 4]; 4] = [
     [5, 7, 1, 3], //

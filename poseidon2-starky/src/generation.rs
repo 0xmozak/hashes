@@ -3,14 +3,14 @@ use crate::columns::{
     COL_OUTPUT_START, COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS,
     ROUNDS_F, ROUNDS_P, STATE_SIZE,
 };
-use crate::poseidon2::Poseidon2;
-use crate::poseidon2::POSEIDON2_GOLDILOCKS_8_PARAMS;
 use ark_ff::{BigInteger, PrimeField};
 use num::bigint::BigUint;
 use plonky2::hash::hash_types::RichField;
 use std::convert::TryInto;
 use std::ops::AddAssign;
 use zkhash::fields::goldilocks::FpGoldiLocks;
+use zkhash::poseidon2::poseidon2::Poseidon2;
+use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
 pub(crate) fn scalar_to_field<RF: RichField, PF: PrimeField>(scalar: &PF) -> RF {
     RF::from_noncanonical_biguint(BigUint::from_bytes_le(&scalar.into_bigint().to_bytes_le()))
