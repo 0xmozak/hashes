@@ -12,7 +12,7 @@ pub(crate) const COL_INPUT_START: usize = 0;
 /// The starting point of the state after each 1st full round
 pub(crate) const COL_1ST_FULLROUND_STATE_START: usize = COL_INPUT_START + STATE_SIZE; // 8
 
-/// The starting point of the state[0] after each partial round
+/// The value of state[0] after each partial round
 pub(crate) const COL_PARTIAL_ROUND_STATE_START: usize =
     COL_1ST_FULLROUND_STATE_START + STATE_SIZE * ROUNDS_F; // 40
 

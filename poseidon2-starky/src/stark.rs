@@ -137,7 +137,7 @@ where
     let mut out = P::ONES;
 
     for _ in 0..SBOX_DEGREE {
-        out = out * *state;
+        out = out.mul(*state);
     }
 
     out
@@ -187,6 +187,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
             state[0] = lv[COL_PARTIAL_ROUND_STATE_START + i];
         }
 
+        // the state before last full rounds
         for i in 0..STATE_SIZE {
             yield_constr.constraint(state[i] - lv[COL_PARTIAL_ROUND_END_STATE_START + i]);
             state[i] = lv[COL_PARTIAL_ROUND_END_STATE_START + i];
