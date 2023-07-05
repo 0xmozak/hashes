@@ -18,6 +18,7 @@ use std::marker::PhantomData;
 use zkhash::fields::goldilocks::FpGoldiLocks;
 use zkhash::poseidon2::poseidon2_instance_goldilocks::{MAT_DIAG8_M_1, RC8};
 
+// used in the linear layer
 const M4: [[usize; 4]; 4] = [
     [5, 7, 1, 3], //
     [4, 6, 1, 1], //
@@ -75,6 +76,7 @@ where
     out
 }
 
+// degree: 1
 fn matmul_internal8_constraints<
     F: RichField + Extendable<D>,
     const D: usize,
@@ -123,7 +125,7 @@ where
     out
 }
 
-// degree: 7
+// degree: SBOX_DEGREE (7)
 fn sbox_p_constraints<F: RichField + Extendable<D>, const D: usize, FE, P, const D2: usize>(
     state: &P,
 ) -> P
