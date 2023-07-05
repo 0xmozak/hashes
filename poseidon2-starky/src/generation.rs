@@ -190,7 +190,7 @@ mod test {
     type F = <C as GenericConfig<D>>::F;
 
     #[test]
-    fn test_field_conversion_vec() {
+    fn field_vec_conversion() {
         let fields: Vec<GoldilocksField> = (0..16).map(|_| GoldilocksField::rand()).collect();
         let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
         let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
@@ -198,7 +198,7 @@ mod test {
     }
 
     #[test]
-    fn test_rounds_generation() {
+    fn rounds_generation() {
         let preimage = (0..STATE_SIZE).map(|_| F::rand()).collect::<Vec<_>>();
         let output0: Vec<[F; STATE_SIZE]> =
             generate_1st_full_round_state(&preimage.clone().try_into().unwrap());
