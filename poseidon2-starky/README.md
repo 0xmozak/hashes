@@ -11,6 +11,9 @@ Below are some benchmarking results for Poseidon2-Starky, including table genera
 | 2^18   | 28s  |
 | 2^19   | 58s  |
 
+## Hasher Details
+The Poseidon2 hasher, configured with `POSEIDON2_GOLDILOCKS_8_PARAMS`, operates on 8 Goldilocks elements. It takes these elements as input and produces an output. Each row in the benchmark results represents a single run of the Poseidon2 hasher.
+
 ## Future Improvements
 1. Speed Enhancements: Future versions could potentially speed up the process. For example, we can reduce the constraints degree with more STARK table columns.
 
