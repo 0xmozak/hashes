@@ -11,3 +11,4 @@ starky = "0.1.1"
 zkhash = { git = "https://github.com/0xmozak/poseidon2", package = "zkhash" }
 num = { version = "0.4", default-features = false, features = ["rand"] }
 lazy_static = "1.4"
+proptest = "1.2.0"

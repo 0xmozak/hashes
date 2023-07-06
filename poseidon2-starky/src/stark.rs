@@ -161,7 +161,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
         P: PackedField<Scalar = FE>,
     {
         let lv = vars.local_values;
-        let mut state = matmul_external8_constraints(lv[0..8].try_into().unwrap());
+        let mut state = matmul_external8_constraints(lv[0..STATE_SIZE].try_into().unwrap());
 
         // first full rounds
         for r in 0..ROUNDS_F {

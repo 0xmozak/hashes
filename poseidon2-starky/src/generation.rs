@@ -178,8 +178,10 @@ mod test {
         generate_outputs, generate_partial_round_state, scalar_to_field_vec, Row,
     };
     use plonky2::field::goldilocks_field::GoldilocksField;
-    use plonky2::field::types::{PrimeField64, Sample};
+    use plonky2::field::types::{Field, PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
     use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
@@ -188,12 +190,14 @@ mod test {
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
 
-    #[test]
-    fn field_vec_conversion() {
-        let fields: Vec<GoldilocksField> = (0..16).map(|_| GoldilocksField::rand()).collect();
-        let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
-        let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
-        assert_eq!(fields, fields2);
+    proptest! {
+        #[test]
+        fn field_vec_conversion(r in 0u64..std::u64::MAX, len in 0usize..20usize) {
+            let fields: Vec<GoldilocksField> = (0..len).map(|_| GoldilocksField::from_canonical_u64(r)).collect();
+            let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
+            let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
+            prop_assert_eq!(fields, fields2);
+        }
     }
 
     #[test]
