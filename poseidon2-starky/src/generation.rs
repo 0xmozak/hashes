@@ -47,7 +47,7 @@ fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field;
 }
 
 /// Function to generate the Poseidon2 trace
-pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
+pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
     let trace_len = step_rows.len();
     let mut trace: Vec<Vec<F>> = vec![vec![F::ZERO; trace_len]; NUM_COLS];
 
@@ -96,12 +96,12 @@ mod test {
             });
         }
 
-        let trace = super::generate_poseidon2_trace(step_rows.clone());
+        let trace = super::generate_poseidon2_trace(&step_rows);
         assert_eq!(trace.len(), 16);
 
         let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
-        for i in 0..num_rows {
-            let input = step_rows[i]
+        for (i, step_row) in step_rows.iter().enumerate().take(num_rows) {
+            let input = step_row
                 .preimage
                 .iter()
                 .map(|x| FpGoldiLocks::from(x.to_canonical_u64()))
@@ -113,8 +113,7 @@ mod test {
                     FpGoldiLocks::from(trace[COL_OUTPUT_START + j][i].to_canonical_u64());
                 assert_eq!(
                     perm[j], expected_val,
-                    "Mismatch at row {}, position {}",
-                    i, j
+                    "Mismatch at row {i}, position {j}"
                 );
             }
         }
