@@ -70,7 +70,7 @@ where
         stored[i] = out[i] + out[4 + i];
     }
     for i in 0..8 {
-        out[i] = out[i] + stored[i % 4];
+        out[i] += stored[i % 4];
     }
 
     out
@@ -95,12 +95,12 @@ where
     let mut sum = P::ZEROS;
 
     for i in 0..STATE_SIZE {
-        sum = sum + state[i];
+        sum += state[i];
     }
 
     for i in 0..STATE_SIZE {
         out[i] = state[i] * scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(MAT_DIAG8_M_1[i]);
-        out[i] = out[i] + sum;
+        out[i] += sum;
     }
 
     out
@@ -180,7 +180,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
         // partial rounds
         for i in 0..ROUNDS_P {
             let r = ROUNDS_F + i;
-            state[0] = state[0] + scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(RC8[r][0]);
+            state[0] += scalar_to_fe::<F, D, FE, D2, FpGoldiLocks>(RC8[r][0]);
             state[0] = sbox_p_constraints(&state[0]);
             state = matmul_internal8_constraints(&state);
             yield_constr.constraint(state[0] - lv[COL_PARTIAL_ROUND_STATE_START + i]);
@@ -264,7 +264,7 @@ mod tests {
         }
 
         let stark = S::default();
-        let trace = generate_poseidon2_trace(step_rows);
+        let trace = generate_poseidon2_trace(&step_rows);
         let trace_poly_values = trace_to_poly_values(trace);
 
         let proof = prove::<F, C, S, D>(

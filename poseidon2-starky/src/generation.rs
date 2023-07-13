@@ -124,7 +124,8 @@ fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field;
     outputs
 }
 
-pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
+/// Function to generate the Poseidon2 trace
+pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
     let trace_len = step_rows.len();
     let mut trace: Vec<Vec<F>> = vec![vec![F::ZERO; trace_len]; NUM_COLS];
 
@@ -184,7 +185,6 @@ mod test {
     use proptest::proptest;
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
-    use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
@@ -225,14 +225,13 @@ mod test {
             });
         }
 
-        let trace = super::generate_poseidon2_trace(step_rows.clone());
-        for i in 0..trace.len() {
-            assert_eq!(trace[i].len(), 16);
+        let trace = super::generate_poseidon2_trace(&step_rows);
+        for trace_item in &trace {
+            assert_eq!(trace_item.len(), 16);
         }
-
-        let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
-        for i in 0..num_rows {
-            let input = step_rows[i]
+        let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
+        for (i, step_row) in step_rows.iter().enumerate().take(num_rows) {
+            let input = step_row
                 .preimage
                 .iter()
                 .map(|x| FpGoldiLocks::from(x.to_canonical_u64()))
@@ -242,11 +241,7 @@ mod test {
             for j in 0..STATE_SIZE {
                 let expected_val =
                     FpGoldiLocks::from(trace[COL_OUTPUT_START + j][i].to_canonical_u64());
-                assert_eq!(
-                    perm[j], expected_val,
-                    "Mismatch at row {}, position {}",
-                    i, j
-                );
+                assert_eq!(perm[j], expected_val, "Mismatch at row {i}, position {j}");
             }
         }
     }
