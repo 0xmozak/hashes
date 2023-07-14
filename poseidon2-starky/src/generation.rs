@@ -31,7 +31,7 @@ pub(crate) fn field_to_scalar_vec<RF: RichField, PF: PrimeField>(field: &[RF]) -
 // Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
 pub struct Row<Field: RichField> {
-    pub preimage: [Field; STATE_SIZE],
+    pub(crate) preimage: [Field; STATE_SIZE],
 }
 
 /// Pad the trace to a power of 2.
@@ -124,7 +124,8 @@ fn generate_outputs<Field: RichField>(preimage: &[Field; STATE_SIZE]) -> [Field;
     outputs
 }
 
-pub fn generate_poseidon2_trace<F: RichField>(step_rows: Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
+/// Function to generate the Poseidon2 trace
+pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F>; NUM_COLS] {
     let trace_len = step_rows.len();
     let mut trace: Vec<Vec<F>> = vec![vec![F::ZERO; trace_len]; NUM_COLS];
 
@@ -178,22 +179,25 @@ mod test {
         generate_outputs, generate_partial_round_state, scalar_to_field_vec, Row,
     };
     use plonky2::field::goldilocks_field::GoldilocksField;
-    use plonky2::field::types::{PrimeField64, Sample};
+    use plonky2::field::types::{Field, PrimeField64, Sample};
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use proptest::prop_assert_eq;
+    use proptest::proptest;
     use zkhash::fields::goldilocks::FpGoldiLocks;
     use zkhash::poseidon2::poseidon2::Poseidon2;
-    use zkhash::poseidon2::poseidon2_instance_goldilocks::POSEIDON2_GOLDILOCKS_8_PARAMS;
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
 
-    #[test]
-    fn field_vec_conversion() {
-        let fields: Vec<GoldilocksField> = (0..16).map(|_| GoldilocksField::rand()).collect();
-        let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
-        let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
-        assert_eq!(fields, fields2);
+    proptest! {
+        #[test]
+        fn field_vec_conversion(r in 0u64..std::u64::MAX, len in 0usize..20usize) {
+            let fields: Vec<GoldilocksField> = (0..len).map(|_| GoldilocksField::from_canonical_u64(r)).collect();
+            let scalars: Vec<FpGoldiLocks> = field_to_scalar_vec(&fields);
+            let fields2: Vec<GoldilocksField> = scalar_to_field_vec(&scalars);
+            prop_assert_eq!(fields, fields2);
+        }
     }
 
     #[test]
@@ -221,14 +225,13 @@ mod test {
             });
         }
 
-        let trace = super::generate_poseidon2_trace(step_rows.clone());
-        for i in 0..trace.len() {
-            assert_eq!(trace[i].len(), 16);
+        let trace = super::generate_poseidon2_trace(&step_rows);
+        for trace_item in &trace {
+            assert_eq!(trace_item.len(), 16);
         }
-
-        let instance = Poseidon2::new(&POSEIDON2_GOLDILOCKS_8_PARAMS);
-        for i in 0..num_rows {
-            let input = step_rows[i]
+        let instance = Poseidon2::new(&super::POSEIDON2_GOLDILOCKS_8_PARAMS);
+        for (i, step_row) in step_rows.iter().enumerate().take(num_rows) {
+            let input = step_row
                 .preimage
                 .iter()
                 .map(|x| FpGoldiLocks::from(x.to_canonical_u64()))
@@ -238,11 +241,7 @@ mod test {
             for j in 0..STATE_SIZE {
                 let expected_val =
                     FpGoldiLocks::from(trace[COL_OUTPUT_START + j][i].to_canonical_u64());
-                assert_eq!(
-                    perm[j], expected_val,
-                    "Mismatch at row {}, position {}",
-                    i, j
-                );
+                assert_eq!(perm[j], expected_val, "Mismatch at row {i}, position {j}");
             }
         }
     }

@@ -1,5 +1,5 @@
 /// The size of the state
-pub const STATE_SIZE: usize = 8;
+pub(crate) const STATE_SIZE: usize = 8;
 pub(crate) const SBOX_DEGREE: usize = 7;
 
 /// Poseidon constants
