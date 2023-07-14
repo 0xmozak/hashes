@@ -28,7 +28,7 @@ fn bench_poseidon2_starky(c: &mut Criterion) {
     }
 
     let stark = S::default();
-    let trace = generate_poseidon2_trace(step_rows);
+    let trace = generate_poseidon2_trace(&step_rows);
     let trace_poly_values = trace_to_poly_values(trace);
 
     let mut timing = TimingTree::default();

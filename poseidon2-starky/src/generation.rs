@@ -31,7 +31,7 @@ pub(crate) fn field_to_scalar_vec<RF: RichField, PF: PrimeField>(field: &[RF]) -
 // Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
 pub struct Row<Field: RichField> {
-    pub(crate) preimage: [Field; STATE_SIZE],
+    pub preimage: [Field; STATE_SIZE],
 }
 
 /// Pad the trace to a power of 2.
