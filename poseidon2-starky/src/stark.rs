@@ -94,8 +94,8 @@ where
     let mut out = [P::ZEROS; 8];
     let mut sum = P::ZEROS;
 
-    for i in 0..STATE_SIZE {
-        sum += state[i];
+    for item in state {
+        sum += *item;
     }
 
     for i in 0..STATE_SIZE {
@@ -144,6 +144,7 @@ where
 }
 
 #[derive(Copy, Clone, Default)]
+#[allow(clippy::module_name_repetitions)]
 pub struct Poseidon2Stark<F, const D: usize> {
     pub _f: PhantomData<F>,
 }
@@ -166,6 +167,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
         // first full rounds
         for r in 0..ROUNDS_F {
             state = add_rc_constraints(&state, r);
+            #[allow(clippy::needless_range_loop)]
             for i in 0..STATE_SIZE {
                 state[i] = sbox_p_constraints(&state[i]);
             }
@@ -197,6 +199,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
         for i in 0..ROUNDS_F {
             let r = ROUNDS_F + ROUNDS_P + i;
             state = add_rc_constraints(&state, r);
+            #[allow(clippy::needless_range_loop)]
             for j in 0..STATE_SIZE {
                 state[j] = sbox_p_constraints(&state[j]);
             }
