@@ -15,14 +15,14 @@ anyhow = "1.0.71"
 ark-ff = { version = "^0.4.2", default-features = false }
 lazy_static = "1.4"
 num = { version = "0.4", default-features = false, features = ["rand"] }
-plonky2 = { path = "../../plonky2/plonky2" }
+plonky2 = { git = "https://github.com/0xmozak/plonky2/", branch = "vivek/poseidon2" }
 proptest = "1.2.0"
-starky = { path = "../../plonky2/starky" } 
+starky = { git = "https://github.com/0xmozak/plonky2/", branch = "vivek/poseidon2" }
 zkhash = { git = "https://github.com/0xmozak/poseidon2", package = "zkhash" }
 
 [dev-dependencies]
 criterion = { version = "0.4.0", default-features = false }
 
 [[bench]]
-name = "poseidon2_starky"
 harness = false
+name = "poseidon2_starky"
