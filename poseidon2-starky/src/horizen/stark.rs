@@ -1,4 +1,4 @@
-use crate::columns::{
+use crate::horizen::columns::{
     COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START,
     COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P,
     SBOX_DEGREE, STATE_SIZE,
@@ -234,9 +234,9 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 
 #[cfg(test)]
 mod tests {
-    use crate::columns::STATE_SIZE;
-    use crate::generation::{generate_poseidon2_trace, Row};
-    use crate::stark::{trace_to_poly_values, Poseidon2Stark};
+    use crate::horizen::columns::STATE_SIZE;
+    use crate::horizen::generation::{generate_poseidon2_trace, Row};
+    use crate::horizen::stark::{trace_to_poly_values, Poseidon2Stark};
     use anyhow::Result;
     use plonky2::field::types::Sample;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};

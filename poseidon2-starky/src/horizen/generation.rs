@@ -1,4 +1,4 @@
-use crate::columns::{
+use crate::horizen::columns::{
     COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START, COL_INPUT_START,
     COL_OUTPUT_START, COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS,
     ROUNDS_F, ROUNDS_P, STATE_SIZE,
@@ -173,8 +173,8 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F
 
 #[cfg(test)]
 mod test {
-    use crate::columns::{COL_OUTPUT_START, STATE_SIZE};
-    use crate::generation::{
+    use crate::horizen::columns::{COL_OUTPUT_START, STATE_SIZE};
+    use crate::horizen::generation::{
         field_to_scalar_vec, generate_1st_full_round_state, generate_2st_full_round_state,
         generate_outputs, generate_partial_round_state, scalar_to_field_vec, Row,
     };
