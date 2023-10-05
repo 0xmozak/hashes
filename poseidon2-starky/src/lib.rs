@@ -9,3 +9,4 @@
 #![allow(clippy::missing_panics_doc)]
 
 pub mod horizen;
+pub mod plonky2;
