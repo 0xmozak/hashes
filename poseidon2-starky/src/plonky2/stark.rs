@@ -150,45 +150,6 @@ where
     out
 }
 
-// linear layer (degree = 1)
-// fn matmul_external12_constraints<
-//     F: RichField + Extendable<D>,
-//     const D: usize,
-//     FE,
-//     P,
-//     const D2: usize,
-//     const STATE_SIZE: usize,
-// >(
-//     state: &[P; STATE_SIZE],
-// ) -> [P; STATE_SIZE]
-// where
-//     FE: FieldExtension<D2, BaseField = F>,
-//     P: PackedField<Scalar = FE>,
-// {
-//     assert_eq!(STATE_SIZE, 12);
-//     let mut out = [P::ZEROS; STATE_SIZE];
-
-//     for i in 0..8 {
-//         for j in 0..4 {
-//             out[i] = if i < 4 {
-//                 out[i] + state[j] * FE::from_canonical_usize(M4[i][j])
-//             } else {
-//                 out[i] + state[j + 4] * FE::from_canonical_usize(M4[i - 4][j])
-//             }
-//         }
-//     }
-
-//     let mut stored = [P::ZEROS; 4];
-//     for i in 0..4 {
-//         stored[i] = out[i] + out[4 + i];
-//     }
-//     for i in 0..STATE_SIZE {
-//         out[i] += stored[i % 4];
-//     }
-
-//     out
-// }
-
 // degree: 1
 fn matmul_internal12_constraints<
     F: RichField + Extendable<D>,
