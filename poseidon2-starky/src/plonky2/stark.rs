@@ -15,14 +15,6 @@ use starky::stark::Stark;
 use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::marker::PhantomData;
 
-// used in the linear layer
-const M4: [[usize; 4]; 4] = [
-    [5, 7, 1, 3], //
-    [4, 6, 1, 1], //
-    [1, 3, 5, 7], //
-    [1, 1, 4, 6],
-];
-
 // degree: 1
 fn add_rc_constraints<
     F: RichField + Extendable<D>,
@@ -67,7 +59,64 @@ where
     out
 }
 
-// linear layer (degree = 1)
+fn matmul_m4_constraints<
+    F: RichField + Extendable<D>,
+    const D: usize,
+    FE,
+    P,
+    const D2: usize,
+    const STATE_SIZE: usize,
+>(
+    state: &[P; STATE_SIZE],
+) -> [P; STATE_SIZE]
+where
+    FE: FieldExtension<D2, BaseField = F>,
+    P: PackedField<Scalar = FE>,
+{
+    // input x = (x0, x1, x2, x3)
+    assert_eq!(STATE_SIZE, 12);
+    let mut out = [P::ZEROS; STATE_SIZE];
+    let t4 = STATE_SIZE / 4;
+    for i in 0..t4 {
+        let start_index = i * 4;
+        // t0 = x0 + x1
+        let t_0 = state[start_index] + state[start_index + 1];
+
+        // t1 = x2 + x3
+        let t_1 = state[start_index + 2] + state[start_index + 3];
+
+        // 2x1
+        let x1_2 = state[start_index + 1].mul(FE::TWO);
+        // 2x3
+        let x3_2 = state[start_index + 3].mul(FE::TWO);
+        let four = FE::TWO + FE::TWO;
+
+        // t2 = 2x1 + t1
+        let t_2 = x1_2 + t_1;
+
+        // t3 = 2x3 + t0
+        let t_3 = x3_2 + t_0;
+
+        // t4 = 4t1 + t3
+        let t_4 = t_3 + t_1.mul(four);
+
+        // t5 = 4t0 + t2
+        let t_5 = t_2 + t_0.mul(four);
+
+        // t6 = t3 + t5
+        let t_6 = t_3 + t_5;
+
+        // t7 = t2 + t4
+        let t_7 = t_2 + t_4;
+
+        out[start_index] = t_6;
+        out[start_index + 1] = t_5;
+        out[start_index + 2] = t_7;
+        out[start_index + 3] = t_4;
+    }
+    out
+}
+
 fn matmul_external12_constraints<
     F: RichField + Extendable<D>,
     const D: usize,
@@ -84,27 +133,61 @@ where
 {
     assert_eq!(STATE_SIZE, 12);
     let mut out = [P::ZEROS; STATE_SIZE];
+    let updated_state = matmul_m4_constraints(state);
 
-    for i in 0..8 {
-        for j in 0..4 {
-            out[i] = if i < 4 {
-                out[i] + state[j] * FE::from_canonical_usize(M4[i][j])
-            } else {
-                out[i] + state[j + 4] * FE::from_canonical_usize(M4[i - 4][j])
-            }
+    let t4 = STATE_SIZE / 4;
+    let mut stored = [P::ZEROS; 4];
+
+    for l in 0..4 {
+        stored[l] = updated_state[l];
+        for j in 1..t4 {
+            stored[l] += updated_state[4 * j + l];
         }
     }
-
-    let mut stored = [P::ZEROS; 4];
-    for i in 0..4 {
-        stored[i] = out[i] + out[4 + i];
-    }
     for i in 0..STATE_SIZE {
-        out[i] += stored[i % 4];
+        out[i] = updated_state[i].add(stored[i % 4]);
     }
-
     out
 }
+
+// linear layer (degree = 1)
+// fn matmul_external12_constraints<
+//     F: RichField + Extendable<D>,
+//     const D: usize,
+//     FE,
+//     P,
+//     const D2: usize,
+//     const STATE_SIZE: usize,
+// >(
+//     state: &[P; STATE_SIZE],
+// ) -> [P; STATE_SIZE]
+// where
+//     FE: FieldExtension<D2, BaseField = F>,
+//     P: PackedField<Scalar = FE>,
+// {
+//     assert_eq!(STATE_SIZE, 12);
+//     let mut out = [P::ZEROS; STATE_SIZE];
+
+//     for i in 0..8 {
+//         for j in 0..4 {
+//             out[i] = if i < 4 {
+//                 out[i] + state[j] * FE::from_canonical_usize(M4[i][j])
+//             } else {
+//                 out[i] + state[j + 4] * FE::from_canonical_usize(M4[i - 4][j])
+//             }
+//         }
+//     }
+
+//     let mut stored = [P::ZEROS; 4];
+//     for i in 0..4 {
+//         stored[i] = out[i] + out[4 + i];
+//     }
+//     for i in 0..STATE_SIZE {
+//         out[i] += stored[i % 4];
+//     }
+
+//     out
+// }
 
 // degree: 1
 fn matmul_internal12_constraints<
@@ -131,7 +214,9 @@ where
 
     for i in 0..STATE_SIZE {
         out[i] = state[i]
-            * FE::from_basefield(F::from_canonical_u64(<F as Poseidon2>::MAT_DIAG12_M_1[i]));
+            * FE::from_basefield(F::from_canonical_u64(
+                <F as Poseidon2>::MAT_DIAG12_M_1[i] - 1,
+            ));
         out[i] += sum;
     }
 
@@ -159,7 +244,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2_12S
         let mut state: [P; STATE_SIZE] =
             matmul_external12_constraints(lv[0..STATE_SIZE].try_into().unwrap());
         // first full rounds
-        for r in 0..ROUNDS_F {
+        for r in 0..(ROUNDS_F / 2) {
             state = add_rc_constraints(&state, r);
             #[allow(clippy::needless_range_loop)]
             for i in 0..STATE_SIZE {
@@ -182,15 +267,15 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2_12S
             state[0] = lv[COL_PARTIAL_ROUND_STATE_START + i];
         }
 
-        // the state before last full rounds
+        // // the state before last full rounds
         for i in 0..STATE_SIZE {
             yield_constr.constraint(state[i] - lv[COL_PARTIAL_ROUND_END_STATE_START + i]);
             state[i] = lv[COL_PARTIAL_ROUND_END_STATE_START + i];
         }
 
-        // last full rounds
-        for i in 0..ROUNDS_F {
-            let r = ROUNDS_F + ROUNDS_P + i;
+        // // last full rounds
+        for i in 0..(ROUNDS_F / 2) {
+            let r = (ROUNDS_F / 2) + i;
             state = add_rc_constraints(&state, r);
             #[allow(clippy::needless_range_loop)]
             for j in 0..STATE_SIZE {
