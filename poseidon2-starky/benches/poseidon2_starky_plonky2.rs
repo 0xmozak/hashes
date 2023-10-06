@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use plonky2::field::types::Sample;
-use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+use plonky2::plonk::config::{GenericConfig, Poseidon2GoldilocksConfig};
 use plonky2::util::timing::TimingTree;
 use poseidon2_starky::plonky2::columns::STATE_SIZE;
 use poseidon2_starky::plonky2::generation::{generate_poseidon2_trace, Row};
@@ -9,7 +9,7 @@ use starky::config::StarkConfig;
 use starky::prover::prove;
 
 const D: usize = 2;
-type C = PoseidonGoldilocksConfig;
+type C = Poseidon2GoldilocksConfig;
 type F = <C as GenericConfig<D>>::F;
 type S = Poseidon2_12Stark<F, D>;
 
