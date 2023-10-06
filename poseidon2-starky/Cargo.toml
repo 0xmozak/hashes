@@ -26,3 +26,7 @@ criterion = { version = "0.4.0", default-features = false }
 [[bench]]
 harness = false
 name = "poseidon2_starky"
+
+[[bench]]
+harness = false
+name = "poseidon2_starky_plonky2"
