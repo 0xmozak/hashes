@@ -8,6 +8,8 @@ use plonky2::hash::{
     poseidon2::{Poseidon2, WIDTH},
 };
 
+use super::columns::COL_IS_EXE;
+
 // Represent a row of the preimage
 #[derive(Debug, Clone, Default)]
 pub struct Row<Field: RichField> {
@@ -17,11 +19,16 @@ pub struct Row<Field: RichField> {
 /// Pad the trace to a power of 2.
 #[must_use]
 fn pad_trace<F: RichField>(mut trace: Vec<Vec<F>>) -> Vec<Vec<F>> {
-    let ext_trace_len = trace[0].len().next_power_of_two();
+    let original_len = trace[0].len();
+    let ext_trace_len = original_len.next_power_of_two();
 
     // All columns have their last value duplicated.
     for row in &mut trace {
         row.resize(ext_trace_len, *row.last().unwrap());
+    }
+    // Set COL_IS_EXE to ZERO
+    for i in original_len..ext_trace_len {
+        trace[COL_IS_EXE][i] = F::ZERO;
     }
 
     trace
@@ -93,6 +100,8 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F
     let mut trace: Vec<Vec<F>> = vec![vec![F::ZERO; trace_len]; NUM_COLS];
 
     for (i, row) in step_rows.iter().enumerate() {
+        trace[COL_IS_EXE][i] = F::ONE;
+
         for j in 0..STATE_SIZE {
             trace[COL_INPUT_START + j][i] = row.preimage[j];
         }

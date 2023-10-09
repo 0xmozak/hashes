@@ -16,6 +16,8 @@ use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+use super::columns::{COL_INPUT_START, COL_IS_EXE};
+
 // degree: 1
 fn add_rc_constraints<
     F: RichField + Extendable<D>,
@@ -209,8 +211,15 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2_12S
         P: PackedField<Scalar = FE>,
     {
         let lv = vars.local_values;
-        let mut state: [P; STATE_SIZE] =
-            matmul_external12_constraints(lv[0..STATE_SIZE].try_into().unwrap());
+
+        // row can be execution or padding.
+        yield_constr.constraint(lv[COL_IS_EXE] * (lv[COL_IS_EXE] - P::ONES));
+
+        let mut state: [P; STATE_SIZE] = matmul_external12_constraints(
+            lv[COL_INPUT_START..(COL_INPUT_START + STATE_SIZE)]
+                .try_into()
+                .unwrap(),
+        );
         // first full rounds
         for r in 0..(ROUNDS_F / 2) {
             state = add_rc_constraints(&state, r);
