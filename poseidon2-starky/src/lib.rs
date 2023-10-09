@@ -7,6 +7,8 @@
 #![deny(clippy::pedantic)]
 #![deny(clippy::cargo)]
 #![allow(clippy::missing_panics_doc)]
+// FIXME: Remove this, when proptest's macro is updated not to trigger clippy.
+#![allow(clippy::ignored_unit_patterns)]
 
 pub mod horizen;
 pub mod plonky2;
