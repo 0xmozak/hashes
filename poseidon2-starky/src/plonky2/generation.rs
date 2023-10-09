@@ -5,7 +5,7 @@ use crate::plonky2::columns::{
 };
 use plonky2::hash::{
     hash_types::RichField,
-    poseidon2::{Poseidon2, ROUND_F_BEGIN, ROUND_F_END, WIDTH},
+    poseidon2::{Poseidon2, WIDTH},
 };
 
 // Represent a row of the preimage
@@ -37,7 +37,7 @@ fn generate_1st_full_round_state<Field: RichField>(
     // Linear layer at start
     Field::matmul_external(&mut current_state);
 
-    for r in 0..ROUND_F_BEGIN {
+    for r in 0..(ROUNDS_F / 2) {
         <Field as Poseidon2>::constant_layer(&mut current_state, r);
         <Field as Poseidon2>::sbox_layer(&mut current_state);
         Field::matmul_external(&mut current_state);
@@ -71,7 +71,7 @@ fn generate_2st_full_round_state<Field: RichField>(
     assert_eq!(STATE_SIZE, WIDTH);
     let mut current_state = *last_rount_output;
 
-    for r in ROUND_F_BEGIN..ROUND_F_END {
+    for r in (ROUNDS_F / 2)..ROUNDS_F {
         <Field as Poseidon2>::constant_layer(&mut current_state, r);
         <Field as Poseidon2>::sbox_layer(&mut current_state);
         Field::matmul_external(&mut current_state);
