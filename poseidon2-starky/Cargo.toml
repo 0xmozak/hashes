@@ -15,9 +15,9 @@ anyhow = "1.0.71"
 ark-ff = { version = "^0.4.2", default-features = false }
 lazy_static = "1.4"
 num = { version = "0.4", default-features = false, features = ["rand"] }
-plonky2 = { git = "https://github.com/0xmozak/plonky2/", branch = "vivek/poseidon2" }
+plonky2 = { git = "https://github.com/0xmozak/plonky2/" }
 proptest = "1.2.0"
-starky = { git = "https://github.com/0xmozak/plonky2/", branch = "vivek/poseidon2" }
+starky = { git = "https://github.com/0xmozak/plonky2/" }
 zkhash = { git = "https://github.com/0xmozak/poseidon2", package = "zkhash" }
 
 [dev-dependencies]
