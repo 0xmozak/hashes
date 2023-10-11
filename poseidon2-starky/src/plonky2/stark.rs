@@ -9,10 +9,11 @@ use plonky2::field::polynomial::PolynomialValues;
 use plonky2::field::types::Field;
 use plonky2::hash::hash_types::RichField;
 use plonky2::hash::poseidon2::Poseidon2;
+use plonky2::iop::ext_target::ExtensionTarget;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
+use starky::evaluation_frame::{StarkEvaluationFrame, StarkFrame};
 use starky::stark::Stark;
-use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::fmt::Display;
 use std::marker::PhantomData;
 
@@ -199,22 +200,30 @@ impl<F, const D: usize> Display for Poseidon2_12Stark<F, D> {
     }
 }
 
+const COLUMNS: usize = NUM_COLS;
+const PUBLIC_INPUTS: usize = 0;
+
 impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2_12Stark<F, D> {
-    const COLUMNS: usize = NUM_COLS;
-    const PUBLIC_INPUTS: usize = 0;
+    type EvaluationFrame<FE, P, const D2: usize> = StarkFrame<P, P::Scalar, COLUMNS, PUBLIC_INPUTS>
+        where
+            FE: FieldExtension<D2, BaseField = F>,
+            P: PackedField<Scalar = FE>;
+    type EvaluationFrameTarget =
+        StarkFrame<ExtensionTarget<D>, ExtensionTarget<D>, COLUMNS, PUBLIC_INPUTS>;
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
-        vars: StarkEvaluationVars<FE, P, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>,
     {
-        let lv = vars.local_values;
+        let lv = vars.get_local_values();
 
         // row can be execution or padding.
         yield_constr.constraint(lv[COL_IS_EXE] * (lv[COL_IS_EXE] - P::ONES));
 
+        #[allow(clippy::range_plus_one)]
         let mut state: [P; STATE_SIZE] = matmul_external12_constraints(
             lv[COL_INPUT_START..(COL_INPUT_START + STATE_SIZE)]
                 .try_into()
@@ -273,7 +282,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2_12S
     fn eval_ext_circuit(
         &self,
         _builder: &mut CircuitBuilder<F, D>,
-        _vars: StarkEvaluationTargets<D, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
+        _vars: &Self::EvaluationFrameTarget,
         _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
         unimplemented!()
@@ -328,7 +337,7 @@ mod tests {
             stark,
             &config,
             trace_poly_values,
-            [],
+            &[],
             &mut TimingTree::default(),
         )?;
         verify_stark_proof(stark, proof, &config)

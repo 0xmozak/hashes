@@ -145,7 +145,7 @@ pub fn generate_poseidon2_trace<F: RichField>(step_rows: &Vec<Row<F>>) -> [Vec<F
 
     add_rows(step_rows, true);
 
-    if step_rows.len() == 0 {
+    if step_rows.is_empty() {
         let preimage = (0..STATE_SIZE).map(|_| F::rand()).collect::<Vec<_>>();
         let dummy_rows = vec![Row {
             preimage: preimage.try_into().expect("can't fail"),

@@ -36,7 +36,7 @@ fn bench_horizen_poseidon2_starky(c: &mut Criterion) {
         b.iter_batched(
             || trace_poly_values.clone(),
             |trace_poly_values| {
-                prove::<F, C, S, D>(stark, &config, trace_poly_values, [], &mut timing).unwrap();
+                prove::<F, C, S, D>(stark, &config, trace_poly_values, &[], &mut timing).unwrap();
             },
             criterion::BatchSize::SmallInput,
         );
