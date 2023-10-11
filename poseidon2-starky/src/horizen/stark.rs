@@ -1,4 +1,4 @@
-use crate::columns::{
+use crate::horizen::columns::{
     COL_1ST_FULLROUND_STATE_START, COL_2ND_FULLROUND_STATE_START,
     COL_PARTIAL_ROUND_END_STATE_START, COL_PARTIAL_ROUND_STATE_START, NUM_COLS, ROUNDS_F, ROUNDS_P,
     SBOX_DEGREE, STATE_SIZE,
@@ -10,10 +10,11 @@ use plonky2::field::packed::PackedField;
 use plonky2::field::polynomial::PolynomialValues;
 use plonky2::field::types::Field;
 use plonky2::hash::hash_types::RichField;
+use plonky2::iop::ext_target::ExtensionTarget;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use starky::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
+use starky::evaluation_frame::{StarkEvaluationFrame, StarkFrame};
 use starky::stark::Stark;
-use starky::vars::{StarkEvaluationTargets, StarkEvaluationVars};
 use std::marker::PhantomData;
 use zkhash::fields::goldilocks::FpGoldiLocks;
 use zkhash::poseidon2::poseidon2_instance_goldilocks::{MAT_DIAG8_M_1, RC8};
@@ -149,19 +150,26 @@ pub struct Poseidon2Stark<F, const D: usize> {
     pub _f: PhantomData<F>,
 }
 
+const COLUMNS: usize = NUM_COLS;
+const PUBLIC_INPUTS: usize = 0;
+
 impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Stark<F, D> {
-    const COLUMNS: usize = NUM_COLS;
-    const PUBLIC_INPUTS: usize = 0;
+    type EvaluationFrame<FE, P, const D2: usize> = StarkFrame<P, P::Scalar, COLUMNS, PUBLIC_INPUTS>
+        where
+            FE: FieldExtension<D2, BaseField = F>,
+            P: PackedField<Scalar = FE>;
+    type EvaluationFrameTarget =
+        StarkFrame<ExtensionTarget<D>, ExtensionTarget<D>, COLUMNS, PUBLIC_INPUTS>;
 
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
-        vars: StarkEvaluationVars<FE, P, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>,
     {
-        let lv = vars.local_values;
+        let lv = vars.get_local_values();
         let mut state = matmul_external8_constraints(lv[0..STATE_SIZE].try_into().unwrap());
 
         // first full rounds
@@ -219,7 +227,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Poseidon2Star
     fn eval_ext_circuit(
         &self,
         _builder: &mut CircuitBuilder<F, D>,
-        _vars: StarkEvaluationTargets<D, { Self::COLUMNS }, { Self::PUBLIC_INPUTS }>,
+        _vars: &Self::EvaluationFrameTarget,
         _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
         unimplemented!()
@@ -234,9 +242,9 @@ pub fn trace_to_poly_values<F: Field, const COLUMNS: usize>(
 
 #[cfg(test)]
 mod tests {
-    use crate::columns::STATE_SIZE;
-    use crate::generation::{generate_poseidon2_trace, Row};
-    use crate::stark::{trace_to_poly_values, Poseidon2Stark};
+    use crate::horizen::columns::STATE_SIZE;
+    use crate::horizen::generation::{generate_poseidon2_trace, Row};
+    use crate::horizen::stark::{trace_to_poly_values, Poseidon2Stark};
     use anyhow::Result;
     use plonky2::field::types::Sample;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
@@ -274,7 +282,7 @@ mod tests {
             stark,
             &config,
             trace_poly_values,
-            [],
+            &[],
             &mut TimingTree::default(),
         )?;
         verify_stark_proof(stark, proof, &config)
